@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Dominik Suszczewicz</title>
+    <link>https://blog.domsu.net/</link>
+    <description>Recent content on Dominik Suszczewicz</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-au</language>
+    <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+    <lastBuildDate>Sun, 29 Mar 2020 17:00:00 +1100</lastBuildDate>
+    
+	<atom:link href="https://blog.domsu.net/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Code generation in Go - constructors</title>
+      <link>https://blog.domsu.net/posts/code-generation-go-constructors/</link>
+      <pubDate>Sun, 29 Mar 2020 17:00:00 +1100</pubDate>
+      
+      <guid>https://blog.domsu.net/posts/code-generation-go-constructors/</guid>
+      <description>A code generation is an interesting concept, where a program generates another program. It&amp;rsquo;s very popular in the Java world, for instance, tools like Dagger rely heavily on it. In the Go ecosystem, the code generation hasn&amp;rsquo;t gained a lot of attention so far. The list of code generators can be found on the official repository https://github.com/golang/go/wiki/GoGenerateTools
+Building a generator is quite a straight forward task, I wrote https://github.com/domsu/goconstruct to prove that.</description>
+    </item>
+    
+  </channel>
+</rss>

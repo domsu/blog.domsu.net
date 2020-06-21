@@ -1,0 +1,195 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Posts on Dominik Suszczewicz</title>
+		<link>https://blog.domsu.net/posts/</link>
+		<description>Recent content in Posts on Dominik Suszczewicz</description>
+		<generator>Hugo -- gohugo.io</generator>
+		<language>en-au</language>
+		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+		<lastBuildDate>Sun, 29 Mar 2020 17:00:00 +1100</lastBuildDate>
+		<atom:link href="https://blog.domsu.net/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>Code generation in Go - constructors</title>
+			<link>https://blog.domsu.net/posts/code-generation-go-constructors/</link>
+			<pubDate>Sun, 29 Mar 2020 17:00:00 +1100</pubDate>
+			
+			<guid>https://blog.domsu.net/posts/code-generation-go-constructors/</guid>
+			<description>A code generation is an interesting concept, where a program generates another program. It&amp;rsquo;s very popular in the Java world, for instance, tools like Dagger rely heavily on it. In the Go ecosystem, the code generation hasn&amp;rsquo;t gained a lot of attention so far. The list of code generators can be found on the official repository https://github.com/golang/go/wiki/GoGenerateTools
+Building a generator is quite a straight forward task, I wrote https://github.com/domsu/goconstruct to prove that.</description>
+			<content type="html"><![CDATA[<p>A code generation is an interesting concept, where a program generates another program. It&rsquo;s very popular in the Java world, for instance, tools like <a href="https://github.com/google/dagger">Dagger</a> rely heavily on it.
+In the Go ecosystem, the code generation hasn&rsquo;t gained a lot of attention so far. The list of code generators can be found on the official repository <a href="https://github.com/golang/go/wiki/GoGenerateTools">https://github.com/golang/go/wiki/GoGenerateTools</a></p>
+<p>Building a generator is quite a straight forward task, I wrote <a href="https://github.com/domsu/goconstruct">https://github.com/domsu/goconstruct</a> to prove that. It&rsquo;s a simple tool, that generates constructors for strut types.
+IDEs such as Goland can already generate constructors, so it&rsquo;s mainly for educational purposes.</p>
+<p>I started by looking for <code>go</code> files in the specified directory and processing each file in the <code>processFile</code> function.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go">	<span class="nx">fileNames</span> <span class="o">:=</span> <span class="nf">getGoFileNamesInDirectory</span><span class="p">(</span><span class="nx">flag</span><span class="p">.</span><span class="nf">Args</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">fileNames</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;No files to process&#34;</span><span class="p">)</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">fileName</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">fileNames</span> <span class="p">{</span>
+		<span class="nf">processFile</span><span class="p">(</span><span class="nx">fileName</span><span class="p">,</span> <span class="nx">typeFilter</span><span class="p">)</span>
+	<span class="p">}</span>
+
+</code></pre></div><p>The <code>go</code> file is parsed into an AST by calling <code>parser.ParseFile</code> which returns <code>ast.File</code> node.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">processFile</span><span class="p">(</span><span class="nx">fileName</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">typeFilter</span> <span class="p">[]</span><span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">fSet</span> <span class="o">:=</span> <span class="nx">token</span><span class="p">.</span><span class="nf">NewFileSet</span><span class="p">()</span>
+	<span class="nx">node</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">parser</span><span class="p">.</span><span class="nf">ParseFile</span><span class="p">(</span><span class="nx">fSet</span><span class="p">,</span> <span class="nx">fileName</span><span class="p">,</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">parser</span><span class="p">.</span><span class="nx">ParseComments</span><span class="p">)</span>
+	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p>The <code>ast.File</code> represents a parsed content of the <code>go</code> source file, giving the access to all declarations, documentation, imports etc.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">File</span> <span class="kd">struct</span> <span class="p">{</span>
+	<span class="nx">Doc</span>        <span class="o">*</span><span class="nx">CommentGroup</span>   <span class="c1">// associated documentation; or nil
+</span><span class="c1"></span>	<span class="nx">Package</span>    <span class="nx">token</span><span class="p">.</span><span class="nx">Pos</span>       <span class="c1">// position of &#34;package&#34; keyword
+</span><span class="c1"></span>	<span class="nx">Name</span>       <span class="o">*</span><span class="nx">Ident</span>          <span class="c1">// package name
+</span><span class="c1"></span>	<span class="nx">Decls</span>      <span class="p">[]</span><span class="nx">Decl</span>          <span class="c1">// top-level declarations; or nil
+</span><span class="c1"></span>	<span class="nx">Scope</span>      <span class="o">*</span><span class="nx">Scope</span>          <span class="c1">// package scope (this file only)
+</span><span class="c1"></span>	<span class="nx">Imports</span>    <span class="p">[]</span><span class="o">*</span><span class="nx">ImportSpec</span>   <span class="c1">// imports in this file
+</span><span class="c1"></span>	<span class="nx">Unresolved</span> <span class="p">[]</span><span class="o">*</span><span class="nx">Ident</span>        <span class="c1">// unresolved identifiers in this file
+</span><span class="c1"></span>	<span class="nx">Comments</span>   <span class="p">[]</span><span class="o">*</span><span class="nx">CommentGroup</span> <span class="c1">// list of all comments in the source file
+</span><span class="c1"></span><span class="p">}</span>
+</code></pre></div><p>At this point, my goal comes down to analyzing the <code>ast.File</code> node.</p>
+<p>Looking at the template of the output file, it&rsquo;s clear that I&rsquo;ve three main problems to solve:
+getting a package name, getting correct imports, generating constructors</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">const</span> <span class="nx">genFileContent</span> <span class="p">=</span> <span class="s">`// Code generated by goconstruct. DO NOT EDIT
+</span><span class="s">
+</span><span class="s">package %s
+</span><span class="s">
+</span><span class="s">import (
+</span><span class="s">%s
+</span><span class="s">)
+</span><span class="s"> 
+</span><span class="s">%s`</span>
+</code></pre></div><h1 id="getting-the-package-name">Getting the package name</h1>
+<p>The generated file is located in the same directory as the source file. I simply use <code>node.Name.Name</code> to get the package name.</p>
+<h1 id="getting-imports">Getting imports</h1>
+<p>The file being processed most likely contains a list of imports used in functions, variables, structs etc.
+The output file though, must only contain a list of imports used in struct types. There should be no missing or unused imports.</p>
+<p>It&rsquo;s done by utilising <code>ast.Inspect(node Node, f func(Node) bool)</code>, it traverses an AST in depth-first order.</p>
+<p>As it traverses the AST, it calls <code>func(Node) bool</code> function notifying about the current node.
+The nodes are declared in the <code>ast</code> package, for instance there are nodes such as <code>StructType</code>, <code>FuncType</code>, <code>ForStmt</code>.</p>
+<p>The following code inspects the nodes, visiting only struct types and their content, returning a map of package names used in struct fields.</p>
+<p>I use the <code>inspectingStruct</code> and <code>depth</code> variables to check whether or not the program is currently inspecting struct&rsquo;s content.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">getPackageNamesUsedInStructFields</span><span class="p">(</span><span class="nx">node</span> <span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">File</span><span class="p">,</span> <span class="nx">structTypeSpecs</span> <span class="p">[]</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">TypeSpec</span><span class="p">)</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">bool</span> <span class="p">{</span>
+	<span class="nx">result</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">bool</span><span class="p">)</span>
+	<span class="kd">var</span> <span class="nx">inspectingStruct</span> <span class="p">=</span> <span class="kc">false</span>
+	<span class="kd">var</span> <span class="nx">depth</span> <span class="p">=</span> <span class="mi">0</span>
+
+	<span class="nx">ast</span><span class="p">.</span><span class="nf">Inspect</span><span class="p">(</span><span class="nx">node</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">n</span> <span class="nx">ast</span><span class="p">.</span><span class="nx">Node</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+		<span class="kd">var</span> <span class="nx">shouldInspect</span> <span class="p">=</span> <span class="kc">false</span>
+		<span class="k">if</span> <span class="nx">n</span> <span class="o">==</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">inspectingStruct</span> <span class="p">{</span>
+			<span class="nx">depth</span><span class="o">--</span>
+			<span class="k">if</span> <span class="nx">depth</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+				<span class="nx">inspectingStruct</span> <span class="p">=</span> <span class="kc">false</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">inspectingStruct</span> <span class="p">{</span>
+			<span class="nx">shouldInspect</span> <span class="p">=</span> <span class="kc">true</span>
+		<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">genDecl</span><span class="p">,</span> <span class="nx">genDeclOk</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">GenDecl</span><span class="p">);</span> <span class="nx">genDeclOk</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">typeSpec</span><span class="p">,</span> <span class="nx">typeSpecOk</span> <span class="o">:=</span> <span class="nx">genDecl</span><span class="p">.</span><span class="nx">Specs</span><span class="p">[</span><span class="mi">0</span><span class="p">].(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">TypeSpec</span><span class="p">);</span> <span class="nx">typeSpecOk</span> <span class="p">{</span>
+				<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">structTypeSpecs</span> <span class="p">{</span>
+					<span class="k">if</span> <span class="nx">typeSpec</span> <span class="o">==</span> <span class="nx">v</span> <span class="p">{</span>
+						<span class="nx">shouldInspect</span> <span class="p">=</span> <span class="kc">true</span>
+						<span class="nx">inspectingStruct</span> <span class="p">=</span> <span class="kc">true</span>
+						<span class="k">break</span>
+					<span class="p">}</span>
+				<span class="p">}</span>
+			<span class="p">}</span>
+		<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">fileOk</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">File</span><span class="p">);</span> <span class="nx">fileOk</span> <span class="p">{</span>
+			<span class="nx">shouldInspect</span> <span class="p">=</span> <span class="kc">true</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">selExpr</span><span class="p">,</span> <span class="nx">selExprOk</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">SelectorExpr</span><span class="p">);</span> <span class="nx">selExprOk</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">ident</span><span class="p">,</span> <span class="nx">identOk</span> <span class="o">:=</span> <span class="nx">selExpr</span><span class="p">.</span><span class="nx">X</span><span class="p">.(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">Ident</span><span class="p">);</span> <span class="nx">identOk</span> <span class="p">{</span>
+				<span class="nx">result</span><span class="p">[</span><span class="nx">ident</span><span class="p">.</span><span class="nx">Name</span><span class="p">]</span> <span class="p">=</span> <span class="kc">true</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">n</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">inspectingStruct</span> <span class="p">{</span>
+			<span class="nx">depth</span><span class="o">++</span>
+		<span class="p">}</span>
+
+		<span class="k">return</span> <span class="nx">shouldInspect</span>
+	<span class="p">})</span>
+	<span class="k">return</span> <span class="nx">result</span>
+<span class="p">}</span>
+
+</code></pre></div><h1 id="generating-constructors">Generating constructors</h1>
+<p>A similar approach is used for the constructor generation.
+For each <code>*ast.TypeSpec</code> in <code>structTypeSpecs</code> there is one constructor to generate.</p>
+<p>I choose the right function prefix - <code>New</code> for an exported struct, <code>new</code> otherwise.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">generateConstructors</span><span class="p">(</span><span class="nx">fSet</span> <span class="o">*</span><span class="nx">token</span><span class="p">.</span><span class="nx">FileSet</span><span class="p">,</span> <span class="nx">structTypeSpecs</span> <span class="p">[]</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">TypeSpec</span><span class="p">)</span> <span class="p">[]</span><span class="kt">string</span> <span class="p">{</span>
+	<span class="kd">var</span> <span class="nx">constructors</span> <span class="p">[]</span><span class="kt">string</span>
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">structTypeSpec</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">structTypeSpecs</span> <span class="p">{</span>
+		<span class="nx">structName</span> <span class="o">:=</span> <span class="nx">structTypeSpec</span><span class="p">.</span><span class="nx">Name</span><span class="p">.</span><span class="nx">Name</span>
+
+		<span class="kd">var</span> <span class="nx">exported</span> <span class="p">=</span> <span class="nx">structName</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">ToUpper</span><span class="p">(</span><span class="nx">structName</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="kd">var</span> <span class="nx">functionPrefix</span> <span class="p">=</span> <span class="s">&#34;new&#34;</span>
+		<span class="k">if</span> <span class="nx">exported</span> <span class="p">{</span>
+			<span class="nx">functionPrefix</span> <span class="p">=</span> <span class="s">&#34;New&#34;</span>
+		<span class="p">}</span>
+	<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p><code>*ast.TypeSpec</code> contains all data I need to generate constructor&rsquo;s arguments and the body.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">generateConstructors</span><span class="p">(</span><span class="nx">fSet</span> <span class="o">*</span><span class="nx">token</span><span class="p">.</span><span class="nx">FileSet</span><span class="p">,</span> <span class="nx">structTypeSpecs</span> <span class="p">[]</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">TypeSpec</span><span class="p">)</span> <span class="p">[]</span><span class="kt">string</span> <span class="p">{</span>
+		<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+		<span class="kd">var</span> <span class="nx">args</span> <span class="p">[]</span><span class="kt">string</span>
+		<span class="kd">var</span> <span class="nx">body</span> <span class="p">[]</span><span class="kt">string</span>
+		<span class="nx">body</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;\ts := %s{}&#34;</span><span class="p">,</span> <span class="nx">structName</span><span class="p">))</span>
+
+		<span class="nx">structType</span> <span class="o">:=</span> <span class="nx">structTypeSpec</span><span class="p">.</span><span class="nx">Type</span><span class="p">.(</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">StructType</span><span class="p">)</span>
+		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">field</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">structType</span><span class="p">.</span><span class="nx">Fields</span><span class="p">.</span><span class="nx">List</span> <span class="p">{</span>
+			<span class="kd">var</span> <span class="nx">buf</span> <span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span>
+			<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">printer</span><span class="p">.</span><span class="nf">Fprint</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">buf</span><span class="p">,</span> <span class="nx">fSet</span><span class="p">,</span> <span class="nx">field</span><span class="p">.</span><span class="nx">Type</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+				<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+			<span class="p">}</span>
+			<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">name</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">field</span><span class="p">.</span><span class="nx">Names</span> <span class="p">{</span>
+				<span class="nx">fieldArg</span> <span class="o">:=</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;%s %s&#34;</span><span class="p">,</span> <span class="nx">name</span><span class="p">,</span> <span class="nx">buf</span><span class="p">.</span><span class="nf">String</span><span class="p">())</span>
+				<span class="nx">args</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">args</span><span class="p">,</span> <span class="nx">fieldArg</span><span class="p">)</span>
+				<span class="nx">body</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;\ts.%s = %s&#34;</span><span class="p">,</span> <span class="nx">name</span><span class="p">,</span> <span class="nx">name</span><span class="p">))</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+		<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p>Having the function name, arguments and the body is all I need to generate the constructor.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">generateConstructors</span><span class="p">(</span><span class="nx">fSet</span> <span class="o">*</span><span class="nx">token</span><span class="p">.</span><span class="nx">FileSet</span><span class="p">,</span> <span class="nx">structTypeSpecs</span> <span class="p">[]</span><span class="o">*</span><span class="nx">ast</span><span class="p">.</span><span class="nx">TypeSpec</span><span class="p">)</span> <span class="p">[]</span><span class="kt">string</span> <span class="p">{</span>
+		<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+		<span class="nx">constructorStructName</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">ToUpper</span><span class="p">(</span><span class="nx">structName</span><span class="p">)[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nx">structName</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+		<span class="nx">constructor</span> <span class="o">:=</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;func %s%s(%s) *%s {\n%s\n}\n&#34;</span><span class="p">,</span> <span class="nx">functionPrefix</span><span class="p">,</span> <span class="nx">constructorStructName</span><span class="p">,</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Join</span><span class="p">(</span><span class="nx">args</span><span class="p">,</span> <span class="s">&#34;,&#34;</span><span class="p">),</span> <span class="nx">structName</span><span class="p">,</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Join</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span> <span class="s">&#34;\n&#34;</span><span class="p">))</span>
+		<span class="nx">constructors</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">constructors</span><span class="p">,</span> <span class="nx">constructor</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="nx">constructors</span>
+<span class="p">}</span>
+</code></pre></div><h1 id="the-output-file">The output file</h1>
+<p>Getting back to the <code>processFile</code> function. I simply use the <code>genFileContent</code> template, combining the package name, imports and constructors - creating the final file.</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">processFile</span><span class="p">(</span><span class="nx">fileName</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">typeFilter</span> <span class="p">[]</span><span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+	<span class="p">(</span><span class="o">...</span><span class="p">)</span>
+	<span class="nx">constructors</span> <span class="o">:=</span> <span class="nf">generateConstructors</span><span class="p">(</span><span class="nx">fSet</span><span class="p">,</span> <span class="nx">structTypeSpecsToProcess</span><span class="p">)</span>
+	<span class="nx">imports</span> <span class="o">:=</span> <span class="nf">generateImports</span><span class="p">(</span><span class="nx">node</span><span class="p">,</span> <span class="nx">structTypeSpecsToProcess</span><span class="p">)</span>
+
+	<span class="nx">ext</span> <span class="o">:=</span> <span class="nx">path</span><span class="p">.</span><span class="nf">Ext</span><span class="p">(</span><span class="nx">fileName</span><span class="p">)</span>
+	<span class="nx">outFile</span> <span class="o">:=</span> <span class="nx">fileName</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="nb">len</span><span class="p">(</span><span class="nx">fileName</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="nx">ext</span><span class="p">)]</span> <span class="o">+</span> <span class="s">&#34;_gen.go&#34;</span>
+	<span class="nx">genFile</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">os</span><span class="p">.</span><span class="nf">OpenFile</span><span class="p">(</span><span class="nx">outFile</span><span class="p">,</span> <span class="nx">os</span><span class="p">.</span><span class="nx">O_RDWR</span><span class="p">|</span><span class="nx">os</span><span class="p">.</span><span class="nx">O_CREATE</span><span class="p">,</span> <span class="mo">0666</span><span class="p">)</span>
+	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="k">defer</span> <span class="nx">genFile</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+
+	<span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">genFile</span><span class="p">.</span><span class="nf">WriteString</span><span class="p">(</span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="nx">genFileContent</span><span class="p">,</span> <span class="nx">node</span><span class="p">.</span><span class="nx">Name</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Join</span><span class="p">(</span><span class="nx">imports</span><span class="p">,</span> <span class="s">&#34;\n&#34;</span><span class="p">),</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Join</span><span class="p">(</span><span class="nx">constructors</span><span class="p">,</span> <span class="s">&#34;\n&#34;</span><span class="p">)));</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><h1 id="conclusion">Conclusion</h1>
+<p>This only touches a surface of a code generation with AST traversal.
+Go has a pretty good support for building code generators. I didn&rsquo;t have to use any external tools and I was surprised how straightforward it was.</p>
+<p>Hopefully my article along with the library is a good blueprint to help others building more advanced code generators. Do you see in your projects blocks of code that could be generated?</p>
+]]></content>
+		</item>
+		
+	</channel>
+</rss>
